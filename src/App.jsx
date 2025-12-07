@@ -1,17 +1,16 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-
-import EquipmentChecklist from './EquipmentChecklist'
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import EquipmentChecklist from './EquipmentChecklist';
+import ManagerDashboard from './ManagerDashboard'; // Import the new file
 
 function App() {
-  
-
   return (
-    <>
-      <EquipmentChecklist/>
-    </>
-  )
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<EquipmentChecklist />} />
+        <Route path="/manager-dashboard" element={<ManagerDashboard />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
-export default App
+export default App;

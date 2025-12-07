@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom'; // <--- 1. Import Hook
 
 // --- TATA CHEMICALS BRANDED DATA ---
 const masterData = {
@@ -41,7 +42,7 @@ const masterData = {
 
 // --- STYLES (Tata Branding) ---
 const colors = {
-  tataBlue: '#0054a6', // Approximate Tata Blue
+  tataBlue: '#0054a6', 
   lightBlue: '#e6f0fa',
   white: '#ffffff',
   border: '#ccc',
@@ -64,8 +65,27 @@ const styles = {
     alignItems: 'center',
     boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
   },
+  // Group title and subtitle together
+  brandTextGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+  },
   brandTitle: { margin: 0, fontSize: '24px', fontWeight: 'bold' },
-  brandSubtitle: { margin: 0, fontSize: '14px', opacity: 0.9, fontWeight: '300', textAlign: 'right' },
+  brandSubtitle: { margin: 0, fontSize: '13px', opacity: 0.9, fontWeight: '300' },
+
+  // New Dashboard Button Style
+  dashboardBtn: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    color: 'white',
+    border: '1px solid rgba(255, 255, 255, 0.4)',
+    padding: '8px 15px',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '13px',
+    fontWeight: 'bold',
+    transition: 'background 0.3s',
+    textTransform: 'uppercase'
+  },
 
   // Form Header
   headerContainer: { backgroundColor: colors.white, padding: '20px', borderRadius: '0 0 8px 8px', marginBottom: '20px', border: `1px solid ${colors.border}`, borderTop: 'none', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' },
@@ -113,8 +133,10 @@ const styles = {
 };
 
 export default function EquipmentChecklist() {
+  const navigate = useNavigate(); // <--- 2. Initialize Navigate Hook
   const [operatorName, setOperatorName] = useState('');
   const [shift, setShift] = useState('Morning');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const { equipments, checklistSpecs } = masterData;
   const [openEquipmentId, setOpenEquipmentId] = useState(null);
@@ -167,21 +189,69 @@ export default function EquipmentChecklist() {
       return;
     }
 
-    console.log(`ACTION TAKEN for ${eqName}:`, {
-      project: "Tata Chemicals - MHY Coal Plant",
-      operator: operatorName,
-      shift: shift,
-      equipmentId: eqId,
-      data: eqData
-    });
-    alert(`Success! Data for ${eqName} has been recorded.`);
+    alert(`Success! Data for ${eqName} has been recorded locally.`);
     setOpenEquipmentId(null);
   };
 
-  const handleGlobalSubmit = () => {
+  const handleGlobalSubmit = async () => {
     if (!operatorName.trim()) return alert("Operator Name is required.");
-    console.log("FULL SUBMISSION:", { operatorName, shift, formData });
-    alert("Full Daily Log Submitted for Tata Chemicals MHY Coal Plant!");
+    if (Object.keys(formData).length === 0) return alert("No data to submit!");
+    if (!window.confirm("Submit Daily Report?")) return;
+
+    setIsSubmitting(true);
+
+    const checklistArray = [];
+
+    // Loop through Equipments and Flatten Data
+    Object.entries(formData).forEach(([eqId, specs]) => {
+        const eqInfo = masterData.equipments.find(e => e.id === eqId);
+        const eqName = eqInfo ? eqInfo.name : eqId; 
+
+        Object.entries(specs).forEach(([specId, details]) => {
+            const specInfo = masterData.checklistSpecs.find(s => s.id === specId);
+            const specName = specInfo ? specInfo.label : specId;
+
+            checklistArray.push({
+                equipmentId: eqId,
+                equipmentName: eqName, 
+                specId: specId,
+                specName: specName,    
+                status: details.status,
+                action: details.action,
+                remarks: details.remarks
+            });
+        });
+    });
+
+    const payload = {
+        operatorName: operatorName,
+        shift: shift,
+        checklist: checklistArray 
+    };
+
+    try {
+        const response = await fetch('http://127.0.0.1:8000/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            alert("✅ Report Saved! ID: " + result.reportId);
+            setFormData({});
+            setOperatorName('');
+            setOpenEquipmentId(null);
+        } else {
+            alert("❌ Server Error: " + result.detail);
+        }
+    } catch (error) {
+        console.error(error);
+        alert("❌ Network Error");
+    } finally {
+        setIsSubmitting(false);
+    }
   };
 
   return (
@@ -189,11 +259,20 @@ export default function EquipmentChecklist() {
       
       {/* --- BRANDING HEADER --- */}
       <div style={styles.brandBar}>
-        <h1 style={styles.brandTitle}>TATA CHEMICALS</h1>
-        <div style={styles.brandSubtitle}>
-          <div>Chemicals Division</div>
-          <div style={{fontSize: '11px', opacity: 0.8}}>MHY Coal Plant Operations</div>
+        <div style={styles.brandTextGroup}>
+            <h1 style={styles.brandTitle}>TATA CHEMICALS</h1>
+            <div style={styles.brandSubtitle}>MHY Coal Plant Operations</div>
         </div>
+
+        {/* --- 3. DASHBOARD BUTTON --- */}
+        <button 
+            style={styles.dashboardBtn} 
+            onClick={() => navigate('/manager-dashboard')} // Replace with your actual route path
+            onMouseOver={(e) => e.target.style.backgroundColor = 'rgba(255,255,255,0.3)'}
+            onMouseOut={(e) => e.target.style.backgroundColor = 'rgba(255,255,255,0.2)'}
+        >
+            Manager Dashboard ➔
+        </button>
       </div>
 
       {/* --- FORM HEADER --- */}
@@ -334,8 +413,16 @@ export default function EquipmentChecklist() {
         );
       })}
 
-      <button style={styles.submitBtn} onClick={handleGlobalSubmit}>
-        SUBMIT DAILY REPORT
+      <button 
+        style={{
+            ...styles.submitBtn, 
+            backgroundColor: isSubmitting ? '#ccc' : '#28a745',
+            cursor: isSubmitting ? 'not-allowed' : 'pointer'
+        }} 
+        onClick={handleGlobalSubmit}
+        disabled={isSubmitting}
+      >
+        {isSubmitting ? 'SAVING TO DATABASE...' : 'SUBMIT DAILY REPORT'}
       </button>
     </div>
   );
