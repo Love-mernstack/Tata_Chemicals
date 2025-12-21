@@ -158,9 +158,6 @@ export default function ManagerDashboard() {
                 <div>
                   <div style={{fontSize:'16px', fontWeight:'bold', color: colors.tataBlue}}>
                     {report.operatorName}
-                    <span style={{fontSize:'12px', fontWeight:'normal', color:'#666', marginLeft:'10px'}}>
-                       ({report.shift} Shift)
-                    </span>
                   </div>
                   <div style={{fontSize:'12px', color:'#888', marginTop:'4px'}}>
                     Submitted: {dateStr}
@@ -187,42 +184,96 @@ export default function ManagerDashboard() {
               {/* Report Details (Expandable) */}
               {isExpanded && (
                 <div style={styles.tableContainer}>
-                  
-                  {/* Option to Filter only Issues? (For now, show all sorted by Not OK first) */}
-                  <table style={styles.table}>
-                    <thead>
-                      <tr>
-                        <th style={styles.th}>Equipment</th>
-                        <th style={styles.th}>Parameter</th>
-                        <th style={styles.th}>Status</th>
-                        <th style={styles.th}>Action</th>
-                        <th style={styles.th}>Remarks</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {/* Sort entries: Put "Not OK" at the top */}
-                      {report.entries.sort((a, b) => (a.status === 'Not OK' ? -1 : 1)).map((entry) => {
-                        const isIssue = entry.status === 'Not OK';
-                        return (
-                          <tr key={entry.id} style={isIssue ? styles.issueRow : styles.okRow}>
-                            <td style={{...styles.td, fontWeight:'bold'}}>{entry.equipmentName}</td>
-                            <td style={styles.td}>{entry.specName}</td>
-                            <td style={styles.td}>
-                              {isIssue ? (
-                                <span style={{color: colors.red, fontWeight:'bold'}}>❌ Not OK</span>
-                              ) : (
-                                <span style={{color: colors.green}}>✓ OK</span>
-                              )}
-                            </td>
-                            <td style={styles.td}>{entry.action || '-'}</td>
-                            <td style={{...styles.td, color: isIssue ? colors.red : 'inherit'}}>
-                                {entry.remarks || '-'}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                  {/* Group entries by equipment */}
+                  {(() => {
+                    // Group entries by equipmentId
+                    const equipmentGroups = {};
+                    report.entries.forEach(entry => {
+                      if (!equipmentGroups[entry.equipmentId]) {
+                        equipmentGroups[entry.equipmentId] = {
+                          name: entry.equipmentName,
+                          remarks: entry.equipmentRemarks,
+                          specs: []
+                        };
+                      }
+                      equipmentGroups[entry.equipmentId].specs.push(entry);
+                    });
+
+                    return Object.entries(equipmentGroups).map(([eqId, eqData]) => {
+                      const issuesInEquipment = eqData.specs.filter(s => s.status === 'Not OK').length;
+                      
+                      return (
+                        <div key={eqId} style={{marginBottom: '25px'}}>
+                          {/* Equipment Header */}
+                          <div style={{
+                            backgroundColor: colors.lightBlue,
+                            padding: '12px 15px',
+                            borderRadius: '4px',
+                            marginBottom: '10px',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}>
+                            <span style={{fontWeight: 'bold', color: colors.tataBlue, fontSize: '15px'}}>
+                              {eqData.name}
+                            </span>
+                            {issuesInEquipment > 0 && (
+                              <span style={{color: colors.red, fontSize: '13px', fontWeight: 'bold'}}>
+                                ⚠️ {issuesInEquipment} Issue{issuesInEquipment > 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Specs Table */}
+                          <table style={styles.table}>
+                            <thead>
+                              <tr>
+                                <th style={{...styles.th, width: '50%'}}>Parameter</th>
+                                <th style={{...styles.th, width: '25%'}}>Status</th>
+                                <th style={{...styles.th, width: '25%'}}>Action</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {eqData.specs.sort((a, b) => (a.status === 'Not OK' ? -1 : 1)).map((entry) => {
+                                const isIssue = entry.status === 'Not OK';
+                                return (
+                                  <tr key={entry.id} style={isIssue ? styles.issueRow : styles.okRow}>
+                                    <td style={styles.td}>{entry.specName}</td>
+                                    <td style={styles.td}>
+                                      {isIssue ? (
+                                        <span style={{color: colors.red, fontWeight:'bold'}}>❌ Not OK</span>
+                                      ) : (
+                                        <span style={{color: colors.green}}>✓ OK</span>
+                                      )}
+                                    </td>
+                                    <td style={styles.td}>{entry.action || '-'}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+
+                          {/* Equipment Remarks */}
+                          {eqData.remarks && (
+                            <div style={{
+                              marginTop: '10px',
+                              padding: '12px',
+                              backgroundColor: '#fffbf0',
+                              borderLeft: `4px solid ${colors.warning}`,
+                              borderRadius: '4px'
+                            }}>
+                              <div style={{fontWeight: 'bold', color: colors.text, marginBottom: '5px', fontSize: '13px'}}>
+                                Equipment Remarks:
+                              </div>
+                              <div style={{color: '#666', fontSize: '13px'}}>
+                                {eqData.remarks}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               )}
             </div>

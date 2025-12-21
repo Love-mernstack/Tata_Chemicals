@@ -4,22 +4,22 @@ import { useNavigate } from 'react-router-dom'; // <--- 1. Import Hook
 // --- TATA CHEMICALS BRANDED DATA ---
 const masterData = {
   equipments: [
-    { id: "eq_01", name: "L-1 Conveyor", location: "Old Coal Plant" },
-    { id: "eq_02", name: "Vibrofeeder -1", location: "Old Coal Plant" },
-    { id: "eq_03", name: "Vibrofeeder-2", location: "Old Coal Plant" },
-    { id: "eq_04", name: "Crusher -1", location: "Old Coal Plant" },
-    { id: "eq_05", name: "Crusher -2", location: "Old Coal Plant" },
-    { id: "eq_06", name: "B2-Conveyor", location: "Old Coal Plant" },
-    { id: "eq_07", name: "P-1 Conveyor", location: "New Coal Plant" },
-    { id: "eq_08", name: "Vibrator -1", location: "New Coal Plant" },
-    { id: "eq_09", name: "Vibrator -2", location: "New Coal Plant" },
-    { id: "eq_10", name: "Crusher -1", location: "New Coal Plant" },
-    { id: "eq_11", name: "Crusher -2", location: "New Coal Plant" },
-    { id: "eq_12", name: "Vibrator-3", location: "New Coal Plant" },
-    { id: "eq_13", name: "Vibrator -4", location: "New Coal Plant" },
-    { id: "eq_14", name: "P2- Conveyor", location: "New Coal Plant" },
-    { id: "eq_15", name: "R1- Conveyor", location: "New Coal Plant" },
-    { id: "eq_16", name: "R2- Conveyor", location: "New Coal Plant" },
+    { id: "eq_01", name: "L-1 Conveyor" },
+    { id: "eq_02", name: "Vibrofeeder -1" },
+    { id: "eq_03", name: "Vibrofeeder-2" },
+    { id: "eq_04", name: "Crusher -1" },
+    { id: "eq_05", name: "Crusher -2" },
+    { id: "eq_06", name: "B2-Conveyor" },
+    { id: "eq_07", name: "P-1 Conveyor" },
+    { id: "eq_08", name: "Vibrator -1" },
+    { id: "eq_09", name: "Vibrator -2" },
+    { id: "eq_10", name: "Crusher -1" },
+    { id: "eq_11", name: "Crusher -2" },
+    { id: "eq_12", name: "Vibrator-3" },
+    { id: "eq_13", name: "Vibrator -4" },
+    { id: "eq_14", name: "P2- Conveyor" },
+    { id: "eq_15", name: "R1- Conveyor" },
+    { id: "eq_16", name: "R2- Conveyor" },
   ],
   checklistSpecs: [
     { id: "sp_01", label: "Abnormal Sound" },
@@ -135,7 +135,6 @@ const styles = {
 export default function EquipmentChecklist() {
   const navigate = useNavigate(); // <--- 2. Initialize Navigate Hook
   const [operatorName, setOperatorName] = useState('');
-  const [shift, setShift] = useState('Morning');
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const { equipments, checklistSpecs } = masterData;
@@ -151,22 +150,39 @@ export default function EquipmentChecklist() {
       ...prev,
       [eqId]: {
         ...prev[eqId],
-        [specId]: {
-          ...prev[eqId]?.[specId],
-          status: status,
-          action: status === 'OK' ? '' : prev[eqId]?.[specId]?.action || 'Repair',
-          remarks: status === 'OK' ? '' : prev[eqId]?.[specId]?.remarks || ''
+        specs: {
+          ...prev[eqId]?.specs,
+          [specId]: {
+            ...prev[eqId]?.specs?.[specId],
+            status: status,
+            action: status === 'OK' ? '' : prev[eqId]?.specs?.[specId]?.action || 'Repair'
+          }
         }
       }
     }));
   };
 
-  const handleDetailChange = (eqId, specId, field, value) => {
+  // Handle action change for specs
+  const handleActionChange = (eqId, specId, value) => {
     setFormData(prev => ({
       ...prev,
       [eqId]: {
         ...prev[eqId],
-        [specId]: { ...prev[eqId]?.[specId], [field]: value }
+        specs: {
+          ...prev[eqId]?.specs,
+          [specId]: { ...prev[eqId]?.specs?.[specId], action: value }
+        }
+      }
+    }));
+  };
+
+  // Handle equipment-level remarks
+  const handleEquipmentRemarks = (eqId, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [eqId]: {
+        ...prev[eqId],
+        remarks: value
       }
     }));
   };
@@ -176,16 +192,11 @@ export default function EquipmentChecklist() {
       alert("Please enter Operator Name at the top before taking action.");
       return;
     }
-    const eqData = formData[eqId] || {};
+    const eqData = formData[eqId]?.specs || {};
     const filledCount = Object.keys(eqData).length;
     
     if (filledCount < checklistSpecs.length) {
       alert(`Incomplete! You have checked ${filledCount}/${checklistSpecs.length} items for ${eqName}.`);
-      return;
-    }
-    const missingRemarks = Object.values(eqData).some(item => item.status === 'Not OK' && !item.remarks);
-    if (missingRemarks) {
-      alert("Please fill in Remarks for all 'Not OK' items.");
       return;
     }
 
@@ -203,29 +214,29 @@ export default function EquipmentChecklist() {
     const checklistArray = [];
 
     // Loop through Equipments and Flatten Data
-    Object.entries(formData).forEach(([eqId, specs]) => {
+    Object.entries(formData).forEach(([eqId, eqData]) => {
         const eqInfo = masterData.equipments.find(e => e.id === eqId);
-        const eqName = eqInfo ? eqInfo.name : eqId; 
+        const eqName = eqInfo ? eqInfo.name : eqId;
+        const equipmentRemarks = eqData.remarks || '';
 
-        Object.entries(specs).forEach(([specId, details]) => {
+        Object.entries(eqData.specs || {}).forEach(([specId, details]) => {
             const specInfo = masterData.checklistSpecs.find(s => s.id === specId);
             const specName = specInfo ? specInfo.label : specId;
 
             checklistArray.push({
                 equipmentId: eqId,
-                equipmentName: eqName, 
+                equipmentName: eqName,
                 specId: specId,
-                specName: specName,    
+                specName: specName,
                 status: details.status,
                 action: details.action,
-                remarks: details.remarks
+                equipmentRemarks: equipmentRemarks
             });
         });
     });
 
     const payload = {
         operatorName: operatorName,
-        shift: shift,
         checklist: checklistArray 
     };
 
@@ -289,14 +300,7 @@ export default function EquipmentChecklist() {
               onChange={(e) => setOperatorName(e.target.value)}
             />
           </div>
-          <div style={styles.formGroup}>
-            <label style={{fontWeight:'bold', color:'#555'}}>Shift Timing:</label>
-            <select style={styles.headerInput} value={shift} onChange={(e) => setShift(e.target.value)}>
-              <option value="Morning">Morning (06:00 - 14:00)</option>
-              <option value="Evening">Evening (14:00 - 22:00)</option>
-              <option value="Night">Night (22:00 - 06:00)</option>
-            </select>
-          </div>
+
           <div style={{ ...styles.formGroup, justifyContent: 'end' }}>
              <span style={{alignSelf:'center', color: '#666', fontWeight:'bold'}}>
                Date: {new Date().toLocaleDateString()}
@@ -307,7 +311,7 @@ export default function EquipmentChecklist() {
 
       {/* --- EQUIPMENT LIST --- */}
       {equipments.map((eq) => {
-        const eqData = formData[eq.id] || {};
+        const eqData = formData[eq.id]?.specs || {};
         const filledCount = Object.keys(eqData).length;
         const isComplete = filledCount === checklistSpecs.length;
 
@@ -322,12 +326,7 @@ export default function EquipmentChecklist() {
         return (
           <div key={eq.id} style={styles.equipmentCard}>
             <div style={headerStyle} onClick={() => toggleAccordion(eq.id)}>
-              <span style={{display: 'flex', flexDirection: 'column'}}>
-                <span style={{fontSize:'16px', color: '#333'}}>{eq.name}</span>
-                <span style={{fontSize:'12px', color:'#777', fontWeight:'normal', marginTop:'4px'}}>
-                   Location: {eq.location}
-                </span>
-              </span>
+              <span style={{fontSize:'16px', color: '#333'}}>{eq.name}</span>
               <span style={{fontSize: '14px'}}>
                 {isComplete ? <span style={{color:'#28a745', marginRight:'10px'}}>✓ Complete</span> : null}
                 {openEquipmentId === eq.id ? '▲' : '▼'}
@@ -340,15 +339,14 @@ export default function EquipmentChecklist() {
                 <table style={styles.table}>
                   <thead>
                     <tr>
-                      <th style={{...styles.th, width: '30%'}}>Parameter</th>
-                      <th style={{...styles.th, width: '25%'}}>Status</th>
-                      <th style={{...styles.th, width: '20%'}}>Action</th>
-                      <th style={{...styles.th, width: '25%'}}>Remarks</th>
+                      <th style={{...styles.th, width: '40%'}}>Parameter</th>
+                      <th style={{...styles.th, width: '30%'}}>Status</th>
+                      <th style={{...styles.th, width: '30%'}}>Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {checklistSpecs.map((spec) => {
-                      const entry = formData[eq.id]?.[spec.id] || {};
+                      const entry = formData[eq.id]?.specs?.[spec.id] || {};
                       const isNotOk = entry.status === 'Not OK';
 
                       return (
@@ -379,22 +377,11 @@ export default function EquipmentChecklist() {
                               <select 
                                 style={styles.select}
                                 value={entry.action || 'Repair'}
-                                onChange={(e) => handleDetailChange(eq.id, spec.id, 'action', e.target.value)}
+                                onChange={(e) => handleActionChange(eq.id, spec.id, e.target.value)}
                               >
                                 <option value="Repair">Repair</option>
                                 <option value="Replace">Replace</option>
                               </select>
-                            )}
-                          </td>
-                          <td style={styles.td}>
-                            {isNotOk && (
-                              <input
-                                type="text"
-                                style={styles.textInput}
-                                placeholder="Issue details..."
-                                value={entry.remarks || ''}
-                                onChange={(e) => handleDetailChange(eq.id, spec.id, 'remarks', e.target.value)}
-                              />
                             )}
                           </td>
                         </tr>
@@ -402,6 +389,29 @@ export default function EquipmentChecklist() {
                     })}
                   </tbody>
                 </table>
+                
+                {/* Equipment-Level Remarks */}
+                <div style={{marginTop: '15px'}}>
+                  <label style={{fontWeight:'bold', color: colors.tataBlue, display:'block', marginBottom:'8px'}}>
+                    Equipment Remarks (Optional):
+                  </label>
+                  <textarea
+                    style={{
+                      width: '100%',
+                      minHeight: '80px',
+                      padding: '10px',
+                      borderRadius: '4px',
+                      border: `1px solid ${colors.border}`,
+                      fontSize: '14px',
+                      fontFamily: 'inherit',
+                      resize: 'vertical'
+                    }}
+                    placeholder="Add any general remarks or observations about this equipment..."
+                    value={formData[eq.id]?.remarks || ''}
+                    onChange={(e) => handleEquipmentRemarks(eq.id, e.target.value)}
+                  />
+                </div>
+                
                 <div style={{overflow: 'hidden', padding: '10px 0'}}>
                    <button style={styles.actionBtn} onClick={() => handleSingleAction(eq.id, eq.name)}>
                      Save {eq.name} Log
