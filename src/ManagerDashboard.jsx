@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { generateISOPDF } from './utils/pdfGenerator';
 
 // --- STYLES (Reusing Tata Branding) ---
 const colors = {
@@ -83,6 +84,8 @@ export default function ManagerDashboard() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedReportId, setExpandedReportId] = useState(null);
+  const [priorityChanges, setPriorityChanges] = useState({}); // Track local priority changes
+  const [saving, setSaving] = useState(false);
 
   // 1. Fetch Data on Load
   useEffect(() => {
@@ -111,10 +114,63 @@ export default function ManagerDashboard() {
     setExpandedReportId(expandedReportId === id ? null : id);
   };
 
-  // Helper: Count Issues
+  // Helper- Count Issues
   const getIssueCount = (entries) => {
     return entries.filter(e => e.status === 'Not OK').length;
   };
+
+  // Handle local priority change
+  const handlePriorityChange = (entryId, newPriority) => {
+    setPriorityChanges(prev => ({
+      ...prev,
+      [entryId]: newPriority || null
+    }));
+  };
+
+  // Get current priority (from local changes or original data)
+  const getCurrentPriority = (entry) => {
+    return priorityChanges.hasOwnProperty(entry.id) 
+      ? priorityChanges[entry.id] 
+      : entry.priority;
+  };
+
+  // Save all priorities
+  const saveAllPriorities = async () => {
+    if (Object.keys(priorityChanges).length === 0) {
+      alert("No priority changes to save");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const updatePromises = Object.entries(priorityChanges).map(([entryId, priority]) =>
+        fetch(`http://127.0.0.1:8000/entries/${entryId}/priority`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ priority })
+        })
+      );
+
+      const results = await Promise.all(updatePromises);
+      const allSuccessful = results.every(r => r.ok);
+
+      if (allSuccessful) {
+        alert(`✅ Successfully saved ${Object.keys(priorityChanges).length} priority changes`);
+        setPriorityChanges({});
+        await fetchReports(); // Refresh data
+      } else {
+        alert("⚠️ Some priorities failed to save");
+      }
+    } catch (error) {
+      console.error('Error saving priorities:', error);
+      alert('❌ Network error while saving');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+
+
 
   if (loading) return <div style={{padding:'20px', textAlign:'center'}}>Loading Dashboard...</div>;
 
@@ -127,9 +183,34 @@ export default function ManagerDashboard() {
           <h1 style={styles.brandTitle}>Manager Dashboard</h1>
           <span style={{fontSize:'12px', opacity:0.8}}>Overview of Daily Inspections</span>
         </div>
-        <button style={styles.backBtn} onClick={() => navigate('/')}>
-          ⬅ Back to Operator Form
-        </button>
+        <div style={{display: 'flex', gap: '10px'}}>
+          <button 
+            style={{
+              ...styles.backBtn,
+              backgroundColor: Object.keys(priorityChanges).length > 0 ? '#28a745' : 'transparent',
+              fontWeight: Object.keys(priorityChanges).length > 0 ? 'bold' : 'normal'
+            }} 
+            onClick={saveAllPriorities}
+            disabled={saving || Object.keys(priorityChanges).length === 0}
+          >
+            {saving ? 'Saving...' : `💾 Save Priorities${Object.keys(priorityChanges).length > 0 ? ` (${Object.keys(priorityChanges).length})` : ''}`}
+          </button>
+          <button 
+            style={{
+              ...styles.backBtn,
+              backgroundColor: '#ff9800',
+              border: '1px solid rgba(255,255,255,0.5)'
+            }} 
+            onClick={() => navigate('/senior-manager-dashboard')}
+            onMouseEnter={(e) => e.target.style.backgroundColor = '#f57c00'}
+            onMouseLeave={(e) => e.target.style.backgroundColor = '#ff9800'}
+          >
+            👔 Senior Manager →
+          </button>
+          <button style={styles.backBtn} onClick={() => navigate('/')}>
+            ⬅ Back to Operator Form
+          </button>
+        </div>
       </div>
 
       {/* --- REPORTS LIST --- */}
@@ -164,7 +245,32 @@ export default function ManagerDashboard() {
                   </div>
                 </div>
 
-                <div style={{display:'flex', alignItems:'center'}}>
+                <div style={{display:'flex', alignItems:'center', gap: '10px'}}>
+                   {/* Download PDF Button */}
+                   <button
+                     onClick={(e) => {
+                       e.stopPropagation();
+                       generateISOPDF(report);
+                     }}
+                     style={{
+                       backgroundColor: colors.tataBlue,
+                       color: 'white',
+                       border: 'none',
+                       padding: '8px 16px',
+                       borderRadius: '4px',
+                       cursor: 'pointer',
+                       fontSize: '12px',
+                       fontWeight: 'bold',
+                       display: 'flex',
+                       alignItems: 'center',
+                       gap: '5px'
+                     }}
+                     onMouseEnter={(e) => e.target.style.backgroundColor = '#003d7a'}
+                     onMouseLeave={(e) => e.target.style.backgroundColor = colors.tataBlue}
+                   >
+                     📄 Download ISO Report
+                   </button>
+                   
                    {/* Status Badge */}
                    {issueCount > 0 ? (
                      <span style={{...styles.badge, backgroundColor: colors.red}}>
@@ -228,9 +334,10 @@ export default function ManagerDashboard() {
                           <table style={styles.table}>
                             <thead>
                               <tr>
-                                <th style={{...styles.th, width: '50%'}}>Parameter</th>
-                                <th style={{...styles.th, width: '25%'}}>Status</th>
-                                <th style={{...styles.th, width: '25%'}}>Action</th>
+                                <th style={{...styles.th, width: '40%'}}>Parameter</th>
+                                <th style={{...styles.th, width: '20%'}}>Status</th>
+                                <th style={{...styles.th, width: '20%'}}>Action</th>
+                                <th style={{...styles.th, width: '20%'}}>Priority</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -247,6 +354,30 @@ export default function ManagerDashboard() {
                                       )}
                                     </td>
                                     <td style={styles.td}>{entry.action || '-'}</td>
+                                    <td style={styles.td}>
+                              {isIssue && (
+                                <select
+                                  value={getCurrentPriority(entry)}
+                                  onChange={(e) => handlePriorityChange(entry.id, e.target.value)}
+                                  style={{
+                                    padding: '5px 8px',
+                                    borderRadius: '4px',
+                                    border: '1px solid #ccc',
+                                    fontSize: '12px',
+                                    cursor: 'pointer',
+                                    backgroundColor: getCurrentPriority(entry) === 'P1' ? '#ffebee' : 
+                                                   getCurrentPriority(entry) === 'P2' ? '#fff3e0' : 
+                                                   getCurrentPriority(entry) === 'P3' ? '#e8f5e9' : 'white'
+                                  }}
+                                >
+                                  <option value="">No Priority</option>
+                                  <option value="P1">P1 - Critical</option>
+                                  <option value="P2">P2 - High</option>
+                                  <option value="P3">P3 - Medium</option>
+                                </select>
+                              )}
+                              {!isIssue && '-'}
+                            </td>
                                   </tr>
                                 );
                               })}

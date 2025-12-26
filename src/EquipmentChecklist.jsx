@@ -146,20 +146,39 @@ export default function EquipmentChecklist() {
   };
 
   const handleStatusChange = (eqId, specId, status) => {
-    setFormData(prev => ({
-      ...prev,
-      [eqId]: {
-        ...prev[eqId],
-        specs: {
-          ...prev[eqId]?.specs,
-          [specId]: {
-            ...prev[eqId]?.specs?.[specId],
-            status: status,
-            action: status === 'OK' ? '' : prev[eqId]?.specs?.[specId]?.action || 'Repair'
+    setFormData(prev => {
+      const currentStatus = prev[eqId]?.specs?.[specId]?.status;
+      
+      // If clicking the same status, uncheck it (clear the selection)
+      if (currentStatus === status) {
+        const updatedSpecs = { ...prev[eqId]?.specs };
+        delete updatedSpecs[specId]; // Remove the spec entry entirely
+        
+        return {
+          ...prev,
+          [eqId]: {
+            ...prev[eqId],
+            specs: updatedSpecs
+          }
+        };
+      }
+      
+      // Otherwise, set the new status normally
+      return {
+        ...prev,
+        [eqId]: {
+          ...prev[eqId],
+          specs: {
+            ...prev[eqId]?.specs,
+            [specId]: {
+              ...prev[eqId]?.specs?.[specId],
+              status: status,
+              action: status === 'OK' ? '' : prev[eqId]?.specs?.[specId]?.action || 'Repair'
+            }
           }
         }
-      }
-    }));
+      };
+    });
   };
 
   // Handle action change for specs
